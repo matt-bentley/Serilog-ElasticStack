@@ -1,4 +1,6 @@
-﻿using Serilog;
+﻿using Logging.Core;
+using Logging.Core.Models;
+using Serilog;
 using Serilog.Sinks.Http.BatchFormatters;
 using System;
 using System.Threading;
@@ -9,40 +11,60 @@ namespace SerilogPublisher
     {
         static void Main(string[] args)
         {
-            ILogger logger = new LoggerConfiguration()
-                .WriteTo.Http(
-                    requestUri: "http://localhost:31312",
-                    batchFormatter: new ArrayBatchFormatter())
-                .WriteTo.Console()
-                .CreateLogger()
-                .ForContext<Program>();
+            Logger.WriteDiagnostic(GetLogDetail("Starting application"));
 
-            logger.Information("Starting Serilog Publisher...");
-
-            for(int i = 0; i < 30; i++)
-            {
-                if(i % 10 == 0)
-                {
-                    try
-                    {
-                        throw new Exception($"There was an error processing {i}");
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.Error(ex, ex.Message);
-                    }
-                }
-                else
-                {
-                    logger.Information($"Processed cycle {i}");
-                }             
-                
+            for(int i = 0; i < 100; i++)
+            {               
+                ProcessAppCycle(i);                
                 Thread.Sleep(50);
             }
 
-            logger.Information("Finishing Serilog Publisher");
+            Logger.WriteDiagnostic(GetLogDetail("Stopping application"));
 
             Thread.Sleep(1000);
+        }
+
+        private static void ProcessAppCycle(int i)
+        {
+            var tracker = GetPerformanceTracker("ProcessAppCycle");           
+
+            if (i % 10 == 0)
+            {
+                try
+                {
+                    throw new Exception($"There was an error processing {i}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.WriteError(GetLogDetail($"Error processing cycle {i}", ex));
+                }
+            }
+            else
+            {
+                Logger.WriteUsage(GetLogDetail($"Processed cycle {i}"));
+            }
+
+            tracker.Stop();
+        }
+
+        private static PerformanceTracker GetPerformanceTracker(string message)
+        {
+            return new PerformanceTracker(message, "", Environment.UserName, "Console","SerilogPublisher","Job", "Development");
+        }
+
+        private static LogDetail GetLogDetail(string message, Exception ex = null)
+        {
+            return new LogDetail
+            {
+                Product = "SerilogPublisher",
+                Location = "Console",    // this application
+                Layer = "Job",                  // unattended executable invoked somehow
+                Environment = "Developement",
+                UserName = Environment.UserName,
+                Hostname = Environment.MachineName,
+                Message = message,
+                Exception = ex
+            };
         }
     }
 }

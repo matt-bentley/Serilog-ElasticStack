@@ -24,6 +24,7 @@ services:
       - "ES_JAVA_OPTS=-Xmx256m -Xms256m"
     ports:
       - 5000:5000
+      - 5043:5043
       - 31311:31311
     networks:
       - esnet
